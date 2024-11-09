@@ -23,13 +23,7 @@ class AuthController extends Controller
             ]
         );
         if ($validateUser->fails()) {
-            return response([
-                'status' => false,
-                'message' => 'eror occured',
-                'error' => $validateUser->errors()->all(),
-
-            ], 401);
-
+            return response()->error('eror occured', $validateUser->errors()->all(), 401);
         }
 
         $user = User::create([
@@ -38,14 +32,9 @@ class AuthController extends Controller
             'password' => $request->password,
         ]);
 
-        return response()->json(
-            [
-                'status' => true,
-                'message' => 'SignUp Successfully',
-                'user' => $user
-            ],
-            200
-        );
+        return response()->success('SignUp Successfully', $user);
+
+
     }
 
     public function login(Request $request)
@@ -61,40 +50,32 @@ class AuthController extends Controller
 
         // Check if validation fails
         if ($validateUser->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Validation errors',
-                'errors' => $validateUser->errors()->all()
-            ], 422);
+            return response()->error('Validation errors', $validateUser->errors()->all(), 422);
+
+
         }
 
         // Attempt to log the user in
         if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
             $authUser = Auth::user();
-            return response()->json([
-                'status' => true,
-                'message' => 'Logged in successfully',
+            return response()->success('Logged in successfully...', [
                 'token' => $authUser->createToken("API Token")->plainTextToken,
-                'token_type'=>'bearer'
-            ], 200);
+                'token_type' => 'bearer'
+            ]);
         } else {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid credentials'
-            ], 401);
+            return response()->error('Invalid credentials', $validateUser->errors()->all(), 401);
+
         }
     }
 
 
-    public function logout(Request $request){
-            // Delete all tokens for the user
-    $user = $request->user();
-    $user->tokens()->delete();
+    public function logout(Request $request)
+    {
+        // Delete all tokens for the user
+        $user = $request->user();
+        $user->tokens()->delete();
+        return response()->success('Logged out successfully');
 
-    return response()->json([
-        'status' => true,
-        'message' => 'Logged out successfully from all sessions',
-    ], 200);
     }
 
 }

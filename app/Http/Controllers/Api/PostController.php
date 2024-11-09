@@ -16,16 +16,8 @@ class PostController extends Controller
     public function index()
     {
         //
-        $data['posts']=Post::all();
-
-        return response()->json(
-            [
-                'status'=>true,
-                'message'=>'all post data',
-                'data'=>$data
-            ]
-            );
-
+        $data['posts'] = Post::all();
+        return response()->success('All post data retrieved successfully', $data['posts']);
     }
 
     /**
@@ -55,11 +47,9 @@ class PostController extends Controller
         );
 
         if ($validateUser->fails()) {
-            return response([
-                'status' => false,
-                'message' => 'Error occurred',
-                'error' => $validateUser->errors()->all(),
-            ], 401);
+
+            return response()->error('Error Occured while uploading', $validateUser->errors()->all(), 401);
+
         }
 
         // Handle image upload
@@ -75,10 +65,8 @@ class PostController extends Controller
 
         // Move the uploaded file
         if (!$img->move($uploadPath, $imageName)) {
-            return response([
-                'status' => false,
-                'message' => 'Image upload failed',
-            ], 500);
+            return response()->error('Error Occured while uploading', $validateUser->errors()->all(), 401);
+
         }
 
         // Save post data to the database
@@ -86,21 +74,13 @@ class PostController extends Controller
             'title' => $request->title,
             'description' => $request->description,
             'user_id' => $request->user_id,
-            'image' =>  $imageName // Store relative path in the database
+            'image' => $imageName // Store relative path in the database
         ]);
 
         if ($postdata) {
-            return response()->json([
-                'status' => true,
-                'message' => 'Post Created Successfully',
-                'post' => $postdata // Renamed 'user' to 'post' for clarity
-            ], 200);
+            return response()->success('All post data retrieved successfully', $postdata);
         }
-
-        return response([
-            'status' => false,
-            'message' => 'Failed to create post',
-        ], 500);
+        return response()->error('Error Occured while uploading', $validateUser->errors()->all(), 500);
     }
 
     /**
@@ -109,16 +89,14 @@ class PostController extends Controller
     public function show(string $id)
     {
         //
-        $data['post']= Post::select(
-            'id','title','description','image'
-        )->where(['id'=>$id])->get();
+        $data['post'] = Post::select(
+            'id',
+            'title',
+            'description',
+            'image'
+        )->where(['id' => $id])->get();
 
-        return response()->json([
-            'status'=>true,
-            'message'=>'post found',
-            'data'=>$data
-        ],200
-        );
+        return response()->success('post found', $data);
     }
 
     /**
@@ -133,101 +111,92 @@ class PostController extends Controller
      * Update the specified resource in storage.
      */
     public function update(Request $request, string $id)
-{
-    // Validate request data
-    $validateUser = Validator::make(
-        $request->all(),
-        [
-            'title' => 'required',
-            'description' => 'required',
-            'user_id' => 'required',
-            'image' => 'nullable|mimes:png,jpg,jpeg,gif' // Image is optional for update
-        ]
-    );
+    {
+        // Validate request data
+        $validateUser = Validator::make(
+            $request->all(),
+            [
+                'title' => 'required',
+                'description' => 'required',
+                'user_id' => 'required',
+                'image' => 'nullable|mimes:png,jpg,jpeg,gif' // Image is optional for update
+            ]
+        );
 
-    if ($validateUser->fails()) {
-        return response([
-            'status' => false,
-            'message' => 'Error occurred',
-            'error' => $validateUser->errors()->all(),
-        ], 401);
-    }
+        if ($validateUser->fails()) {
+            return response()->error('Error occurred', $validateUser->errors()->all(), 401);
 
-    // Fetch the post by ID
-    $postUpdate = Post::findOrFail($id);  // Correct way to find a post
-
-    // Handle image upload if a new image is provided
-    if ($request->hasFile('image')) {
-        $path = public_path('uploads');
-
-        // If there's an old image, delete it
-        if ($postUpdate->image && file_exists($path . '/' . $postUpdate->image)) {
-            unlink($path . '/' . $postUpdate->image);
         }
 
-        // Upload the new image
-        $img = $request->file('image');
-        $ext = $img->getClientOriginalExtension();
-        $imageName = time() . '.' . $ext;
+        // Fetch the post by ID
+        $postUpdate = Post::findOrFail($id);  // Correct way to find a post
 
-        // Make sure 'uploads' directory exists
-        if (!file_exists($path)) {
-            mkdir($path, 0777, true);
+        // Handle image upload if a new image is provided
+        if ($request->hasFile('image')) {
+            $path = public_path('uploads');
+
+            // If there's an old image, delete it
+            if ($postUpdate->image && file_exists($path . '/' . $postUpdate->image)) {
+                unlink($path . '/' . $postUpdate->image);
+            }
+
+            // Upload the new image
+            $img = $request->file('image');
+            $ext = $img->getClientOriginalExtension();
+            $imageName = time() . '.' . $ext;
+
+            // Make sure 'uploads' directory exists
+            if (!file_exists($path)) {
+                mkdir($path, 0777, true);
+            }
+
+            // Move the uploaded file to the 'uploads' directory
+            $img->move($path, $imageName);
+
+        } else {
+            // If no new image, keep the old image
+            $imageName = $postUpdate->image;
         }
 
-        // Move the uploaded file to the 'uploads' directory
-        $img->move($path, $imageName);
+        // Update the post in the database
+        $postUpdate->update([
+            'title' => $request->title,
+            'description' => $request->description,
+            'user_id' => $request->user_id,
+            'image' => 'uploads/' . $imageName  // Store the relative image path
+        ]);
 
-    } else {
-        // If no new image, keep the old image
-        $imageName = $postUpdate->image;
+        // Return the updated post data
+        return response()->success('Post Updated Successfully', $postUpdate);
+
     }
-
-    // Update the post in the database
-    $postUpdate->update([
-        'title' => $request->title,
-        'description' => $request->description,
-        'user_id' => $request->user_id,
-        'image' => 'uploads/' . $imageName  // Store the relative image path
-    ]);
-
-    // Return the updated post data
-    return response()->json([
-        'status' => true,
-        'message' => 'Post Updated Successfully',
-        'post' => $postUpdate
-    ], 200);
-}
 
     /**
- * Remove the specified resource from storage.
- */
-public function destroy(string $id)
-{
-    // Find the post by ID
-    $post = Post::findOrFail($id);
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        // Find the post by ID
+        $post = Post::findOrFail($id);
 
-    // Path to the image file
-    $path = public_path('uploads/' . $post->image);
+        // Path to the image file
+        $path = public_path('uploads/' . $post->image);
 
-    // If the post has an image and the file exists, delete it
-    if ($post->image && file_exists($path)) {
-        unlink($path);
+        // If the post has an image and the file exists, delete it
+        if ($post->image && file_exists($path)) {
+            unlink($path);
+        }
+
+        // Delete the post from the database
+        if ($post->delete()) {
+            return response()->success('Post and its image deleted successfully', $post);
+
+        }
+
+        // If the deletion failed
+        return response()->error('Failed to delete post', $post->errors()->all(), 401);
+
+
     }
-
-    // Delete the post from the database
-    if ($post->delete()) {
-        return response()->json([
-            'status' => true,
-            'message' => 'Post and its image deleted successfully',
-        ], 200);
-    }
-
-    // If the deletion failed
-    return response()->json([
-        'status' => false,
-        'message' => 'Failed to delete post',
-    ], 500);
-}
 
 }
